@@ -1,0 +1,358 @@
+
+####### Creation des volumes
+
+maprcli volume create -name raw-data -path /user/mapr/projet/data/raw-data
+maprcli volume create -name clean-data -path /user/mapr/projet/data/clean-data
+maprcli volume create -name modeled-data -path /user/mapr/projet/data/modeled-data
+
+####### Creation des echelles plannification
+maprcli schedule create -schedule '{"name":"Daily30","rules":[{"frequency":"daily","retain":"30d","time":0}]}'
+
+maprcli schedule create -schedule '{"name":"Weekly90","rules":[{"frequency":"weekly","retain":"90d","time":0}]}'
+
+maprcli schedule create -schedule '{"name":"Monthly180","rules":[{"frequency":"monthly","retain":"180d","time":0}]}'
+
+
+############### Creation de snapshot
+maprcli volume snapshot create -volume raw-data -snapshotname raw-data-snapshot -retain 30d
+
+maprcli volume snapshot create -volume clean-data -snapshotname clean-data-snapshot -retain 90d
+
+maprcli volume snapshot create -volume modeled-data -snapshotname modeled-data-snapshot -retain 180d
+
+############### Creation de volume miroirs
+
+maprcli volume create -name raw-data-mirror -source raw-data@demo.mapr.com -type mirror -path /user/mapr/projet/mirror/raw-data-mirror
+
+maprcli volume create -name clean-data-mirror -source clean-data@demo.mapr.com -type mirror -path /user/mapr/projet/mirror/clean-data-mirror
+
+maprcli volume create -name modeled-data-mirror -source modeled-data@demo.mapr.com -type mirror -path /user/mapr/projet/mirror/modeled-data-mirror
+
+maprcli volume mirror start -name raw-data-mirror
+maprcli volume mirror start -name clean-data-mirror
+#########################
+work, product_size, subject and image_link tables
+CREATE EXTERNAL TABLE work (
+work_id INT,
+name STRING,
+artist_id INT,
+style STRING,
+museum_id
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LOCATION '/user/mapr/projet/data/raw-data';
+
+
+		
+
+CREATE EXTERNAL TABLE product_size (
+work_id INT,
+size_id INT,
+sale_price INT,
+regular_price INT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LOCATION '/user/mapr/projet/data/raw-data';
+
+
+
+CREATE EXTERNAL TABLE subject (
+work_id INT,
+subject STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LOCATION '/user/mapr/projet/data/raw-data';
+
+,
+CREATE EXTERNAL TABLE image_link (
+work_id INT,
+url STRING,
+thumbnail_small_url INT,
+style STRING,
+thumbnail_large_url STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LOCATION '/user/mapr/projet/data/raw-data';
+
+CREATE EXTERNAL TABLE artist (
+artist_id int,
+full_name STRING,
+first_name STRING,
+middle_names STRING,
+last_name STRING,
+nationality STRING,
+style STRING,
+birth int,
+death int
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LOCATION '/user/mapr/projet/data/raw-data';
+
+-- Créer une table externe vide
+DROP TABLE IF EXISTS work_clean;
+CREATE EXTERNAL TABLE work_clean (
+    -- Spécifiez les colonnes selon vos besoins
+    work_id INT,
+    name STRING,
+    artist_id INT,
+    style STRING,
+    museum_id INT
+    -- ...
+)
+STORED AS PARQUET
+LOCATION '/user/mapr/projet/data/clean-data/work_clean/';
+
+-- Insérer les données nettoyées dans la table externe
+INSERT OVERWRITE TABLE work_clean
+SELECT
+    work_id,
+    name,
+    artist_id,
+    style,
+    museum_id
+FROM (
+    SELECT 
+        work_id,
+        name,
+        artist_id,
+        style,
+        museum_id,
+        ROW_NUMBER() OVER (PARTITION BY work_id ORDER BY work_id) as row_num
+    FROM work
+) ranked
+WHERE row_num = 1;
+
+
+
+
+-- Créer une table externe vide product_size_clean
+DROP TABLE IF EXISTS product_size_clean;
+CREATE EXTERNAL TABLE product_size_clean (
+    -- Spécifiez les colonnes selon vos besoins
+    work_id INT,
+    size_id INT,
+sale_price INT,
+regular_price INT
+    -- ...
+)
+STORED AS PARQUET
+LOCATION '/user/mapr/projet/data/clean-data/product_size_clean/';
+
+-- Insérer les données nettoyées dans la table externe
+INSERT OVERWRITE TABLE product_size_clean
+SELECT
+work_id ,
+size_id ,
+sale_price ,
+regular_price 
+FROM (
+    SELECT 
+work_id ,
+size_id ,
+sale_price ,
+regular_price ,
+        ROW_NUMBER() OVER (PARTITION BY work_id ORDER BY work_id) as row_num
+    FROM product_size
+) ranked
+WHERE row_num = 1;
+
+
+##################
+-- Créer une table externe subject vide
+DROP TABLE IF EXISTS subject_clean;
+CREATE EXTERNAL TABLE subject_clean (
+    -- Spécifiez les colonnes selon vos besoins
+work_id INT,
+subject STRING
+    -- ...
+)
+STORED AS PARQUET
+LOCATION '/user/mapr/projet/data/clean-data/subject_clean/';
+
+-- Insérer les données nettoyées dans la table externe
+INSERT OVERWRITE TABLE subject_clean
+SELECT
+work_id,
+subject  
+FROM (
+    SELECT 
+work_id ,
+subject ,
+        ROW_NUMBER() OVER (PARTITION BY work_id ORDER BY work_id) as row_num
+    FROM subject
+) ranked
+WHERE row_num = 1;
+
+
+
+
+-- Créer une nouvelle table sans les lignes avec des valeurs manquantes
+DROP TABLE IF EXISTS subject_clean;
+CREATE TABLE subject_clean AS
+SELECT * FROM subject
+WHERE subject.work_id IS NOT NULL AND subject.subject IS NOT NULL; -- Ajoutez des conditions pour chaque colonne avec des valeurs manquantes
+STORED AS PARQUET
+LOCATION '/user/mapr/projet/data/clean-data/subject_clean/';
+
+-- Renommer la nouvelle table pour remplacer l'ancienne si nécessaire
+ALTER TABLE nouvelle_table RENAME TO votre_table;
+
+-- Supprimer l'ancienne table si nécessaire
+-- DROP TABLE votre_table;
+
+##########Creation de la table subject_clean
+-- Supprimer la table si elle existe déjà
+DROP TABLE IF EXISTS subject_clean;
+
+-- Créer une nouvelle table avec des données filtrées et spécifier l'emplacement
+CREATE TABLE subject_clean 
+LOCATION '/user/mapr/projet/data/clean-data/subject_clean/'
+AS
+SELECT * FROM subject
+WHERE work_id IS NOT NULL AND subject IS NOT NULL;
+
+
+######  product_size_clean
+DROP TABLE IF EXISTS product_size_clean;
+
+-- Créer une nouvelle table avec des données filtrées et spécifier l'emplacement
+CREATE TABLE product_size_clean 
+LOCATION '/user/mapr/projet/data/clean-data/product_size_clean/'
+AS
+SELECT * FROM product_size
+WHERE work_id IS NOT NULL AND size_id IS NOT NULL AND sale_price IS NOT NULL AND regular_price IS NOT NULL;
+
+
+##########Creation de la table subject_clean
+-- Supprimer la table si elle existe déjà
+DROP TABLE IF EXISTS work_clean;
+
+-- Créer une nouvelle table avec des données filtrées et spécifier l'emplacement
+CREATE TABLE work_clean 
+LOCATION '/user/mapr/projet/data/clean-data/work_clean/'
+AS
+SELECT * FROM work
+WHERE work_id IS NOT NULL AND name IS NOT NULL AND artist_id IS NOT NULL AND style IS NOT NULL AND museum_id IS NOT NULL;
+
+CREATE EXTERNAL TABLE modele (
+work_id INT,
+work_clean.artist_id int,
+prix_moyen
+
+)
+STORED AS PARQUET
+LOCATION '/user/mapr/retail-data-modeled/sales_fact/';
+
+
+
+CREATE TABLE work_clean 
+LOCATION '/user/mapr/projet/data/clean-data/work_clean/'
+AS
+SELECT * FROM work
+WHERE work_id IS NOT NULL AND name IS NOT NULL AND artist_id IS NOT NULL AND style IS NOT NULL AND museum_id IS NOT NULL;
+
+CREATE TABLE product_size_clean 
+LOCATION '/user/mapr/projet/data/clean-data/product_size_clean/'
+AS
+SELECT * FROM product_size
+WHERE work_id IS NOT NULL AND size_id IS NOT NULL AND sale_price IS NOT NULL AND regular_price IS NOT NULL;
+
+CREATE TABLE subject_clean 
+LOCATION '/user/mapr/projet/data/clean-data/subject_clean/'
+AS
+SELECT * FROM subject
+WHERE work_id IS NOT NULL AND subject IS NOT NULL;
+
+#####Creation de la table joine_table
+
+DROP TABLE if EXISTS joined_table; 
+CREATE EXTERNAL TABLE joined_table(
+    work_id int,
+    name STRING,
+	artist_id int,
+	museum_id int,
+    sale_price int,
+    subject string
+	
+)
+LOCATION '/user/mapr/projet/data/clean-data/joined_table/';
+
+-- Insérer les données à partir de la requête SELECT dans la table externe
+INSERT OVERWRITE TABLE joined_table
+SELECT w.work_id, w.name, ps.sale_price, sc.subject, w.museum_id, w.artist_id
+FROM work_clean w
+JOIN product_size_clean ps ON w.work_id = ps.work_id
+JOIN subject_clean sc ON w.work_id = sc.work_id;
+
+
+
+
+-- Supprimer la table si elle existe déjà
+DROP TABLE IF EXISTS joined_table2;
+
+-- Créer la table avec la structure souhaitée
+CREATE EXTERNAL TABLE joined_table2 (
+    work_id INT,
+    name STRING,
+    artist_id INT,
+    museum_id INT,
+    sale_price INT,
+    subject STRING,
+    full_name STRING,
+    nationality STRING,
+    style STRING,
+    birth INT,
+    death INT
+)
+LOCATION '/user/mapr/projet/data/clean-data/joined_table2/';
+
+-- Insérer les données à partir de la requête SELECT dans la table externe
+INSERT OVERWRITE TABLE joined_table2
+SELECT 
+    j.work_id, 
+    j.name, 
+    j.sale_price, 
+    j.subject, 
+    j.museum_id, 
+    j.artist_id, 
+    a.full_name,
+    a.nationality,
+    a.style,
+    a.birth,
+    a.death
+FROM 
+    joined_table j
+JOIN 
+    artist a ON j.artist_id = a.artist_id;
+
+
+Prix moyen par artist des oeuvres par artist
+
+DROP TABLE IF EXISTS Sales_Fact;
+-- Create the external table as Parquet and store the result
+CREATE EXTERNAL TABLE prix_artist (
+artist_id INT,
+full_name,
+prix_moyen FLOAT
+)
+STORED AS PARQUET
+LOCATION '/user/mapr/projet/data/modeled-data/Artiste_prix_moyen_oeuvre';
+
+
+
+
+-- Calculer le prix moyen par artiste et insérer les résultats dans la table prix_artist
+INSERT OVERWRITE TABLE prix_artist
+SELECT
+    artist_id,
+	full_name,
+    AVG(sale_price) AS prix_moyen
+FROM
+    joined_table2
+GROUP BY
+    artist_id;

@@ -1,0 +1,22 @@
+Le mirroring en cascade, parfois appelé mirroring hiérarchique, est une stratégie de sauvegarde et de redondance dans laquelle les données sont répliquées à plusieurs niveaux ou niveaux de hiérarchie.
+
+Dans un schéma de mirroring en cascade, les données sont d'abord répliquées depuis la source vers un premier ensemble de miroirs, puis ces miroirs primaires sont à leur tour répliqués vers d'autres miroirs, créant ainsi une cascade de réplication.
+
+Voici un exemple simplifié d'un schéma de mirroring en cascade :
+
+Niveau 1 (Source) :
+
+Les données sont stockées sur la source principale.
+Niveau 2 (Miroirs Primaires) :
+
+Les données de la source principale sont répliquées vers plusieurs miroirs primaires.
+Niveau 3 (Miroirs Secondaires) :
+
+Chaque miroir primaire réplique ses données vers plusieurs miroirs secondaires.
+La principale caractéristique du mirroring en cascade est la propagation des données à travers plusieurs niveaux de réplication, offrant ainsi une redondance supplémentaire et une meilleure disponibilité des données. En cas de défaillance d'un miroir à un niveau donné, les données peuvent toujours être récupérées à partir d'un niveau supérieur dans la cascade.
+
+Cependant, le mirroring en cascade peut également introduire une latence supplémentaire dans la réplication des données, car chaque niveau de réplication doit attendre que les données soient reçues avant de les répliquer vers le niveau suivant. De plus, la gestion et la coordination des différents niveaux de miroirs peuvent devenir complexes à mesure que la cascade s'approfondit.
+
+En résumé, le mirroring en cascade est une stratégie efficace pour améliorer la résilience et la redondance des données, mais elle nécessite une planification et une gestion appropriées pour garantir des performances optimales et une cohérence des données à tous les niveaux de la cascade.
+
+https://docs.mapr.com/datafabric-customer-managed/75/AdministratorGuide/MirrorVolumes-MirrorCascades.html
